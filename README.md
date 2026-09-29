@@ -30,10 +30,11 @@ Currently implemented:
 - PostgreSQL persistence
 - UUID transaction identifiers
 - Authorization status tracking
+- Idempotency key support
+- Duplicate authorization prevention for sequential retries
 
 Planned:
 
-- Idempotency
 - Concurrent request handling
 - Card network communication
 - Timeouts and retries
