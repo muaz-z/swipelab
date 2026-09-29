@@ -2,25 +2,13 @@
 
 SwipeLab is an educational payment processing system built to explore how a card payment travels from a merchant to an issuing bank.
 
-The project is inspired by *Anatomy of the Swipe* and focuses on implementing payment infrastructure concepts rather than integrating with a real card network.
+The project is inspired by *The Anatomy of the Swipe* by Ahmed Siddiqui and focuses on implementing payment infrastructure concepts rather than integrating with a real card network.
 
 ## Architecture
 
-```text
-POS
- │
- ▼
-Acquirer Processor
- │
- ▼
-Card Network
- │
- ▼
-Issuer Processor
- │
- ▼
-Cardholder Account
-```
+![Payment processing flow: Merchant to Acquirer Processor to Network to Issuer Processor, with Acquiring and Issuing Banks below](docs/payment-flow.png)
+
+*Diagram from* The Anatomy of the Swipe *by Ahmed Siddiqui.*
 
 Each component is implemented as an independent service and communicates over network protocols rather than importing code from other services.
 
