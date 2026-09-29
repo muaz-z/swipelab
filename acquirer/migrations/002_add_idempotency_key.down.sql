@@ -1,0 +1,4 @@
+DROP INDEX authorizations_merchant_id_idempotency_key_unique;
+
+ALTER TABLE authorizations
+DROP COLUMN idempotency_key;
