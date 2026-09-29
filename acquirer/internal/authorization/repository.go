@@ -3,6 +3,7 @@ package authorization
 import (
 	"context"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -24,10 +25,11 @@ func (r *Repository) Create(ctx context.Context, auth Authorization) error {
 			amount,
 			currency,
 			status,
+			idempotency_key,
 			created_at,
 			updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 
 	_, err := r.db.Exec(
@@ -38,9 +40,57 @@ func (r *Repository) Create(ctx context.Context, auth Authorization) error {
 		auth.Amount,
 		auth.Currency,
 		auth.Status,
+		auth.IdempotencyKey,
 		auth.CreatedAt,
 		auth.CreatedAt,
 	)
 
 	return err
+}
+
+func (r *Repository) FindByIdempotencyKey(
+	ctx context.Context,
+	merchantID string,
+	idempotencyKey string,
+) (*Authorization, error) {
+	query := `
+		SELECT
+			id,
+			merchant_id,
+			amount,
+			currency,
+			status,
+			idempotency_key,
+			created_at
+		FROM authorizations
+		WHERE merchant_id = $1
+		  AND idempotency_key = $2
+	`
+
+	var auth Authorization
+
+	err := r.db.QueryRow(
+		ctx,
+		query,
+		merchantID,
+		idempotencyKey,
+	).Scan(
+		&auth.ID,
+		&auth.MerchantID,
+		&auth.Amount,
+		&auth.Currency,
+		&auth.Status,
+		&auth.IdempotencyKey,
+		&auth.CreatedAt,
+	)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &auth, nil
+
 }

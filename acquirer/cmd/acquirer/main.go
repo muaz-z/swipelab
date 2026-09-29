@@ -52,6 +52,17 @@ func handleAuthorization(w http.ResponseWriter, r *http.Request, repository *aut
 		return
 	}
 
+	idempotencyKey := r.Header.Get("idempotency-key")
+
+	if idempotencyKey == "" {
+		http.Error(
+			w,
+			"Idempotency-Key header is required",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
 	var request authorization.Request
 
 	err := json.NewDecoder(r.Body).Decode(&request)
@@ -80,7 +91,25 @@ func handleAuthorization(w http.ResponseWriter, r *http.Request, repository *aut
 
 	}
 
-	auth := authorization.New(request)
+	existingAuth, err := repository.FindByIdempotencyKey(
+		r.Context(),
+		request.MerchantID,
+		idempotencyKey,
+	)
+
+	if err != nil {
+		fmt.Println("failed to check idempotency key", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+	}
+
+	if existingAuth != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(existingAuth)
+		return
+	}
+
+	auth := authorization.New(request, idempotencyKey)
 
 	err = repository.Create(r.Context(), auth)
 	if err != nil {
