@@ -32,17 +32,18 @@ Currently implemented:
 - Authorization status tracking
 - Idempotency key support
 - Duplicate authorization prevention for sequential retries
+- Concurrency-safe idempotency
 
 Planned:
 
-- Concurrent request handling
-- Card network communication
+- Card network integration
 - Timeouts and retries
 - Authorization responses
 - Capture
 - Reversals
 - Clearing and settlement
 - Reconciliation
+- Automated tests
 
 ### Card Network
 
