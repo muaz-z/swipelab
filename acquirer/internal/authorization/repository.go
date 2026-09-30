@@ -2,8 +2,10 @@ package authorization
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -16,6 +18,8 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 		db: db,
 	}
 }
+
+var ErrDuplicateIdempotencyKey = errors.New("duplicate idempotency key")
 
 func (r *Repository) Create(ctx context.Context, auth Authorization) error {
 	query := `
@@ -45,7 +49,16 @@ func (r *Repository) Create(ctx context.Context, auth Authorization) error {
 		auth.CreatedAt,
 	)
 
-	return err
+	if err != nil {
+		var pgErr *pgconn.PgError
+
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return ErrDuplicateIdempotencyKey
+		}
+		return err
+	}
+
+	return nil
 }
 
 func (r *Repository) FindByIdempotencyKey(

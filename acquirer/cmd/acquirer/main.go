@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -112,6 +113,31 @@ func handleAuthorization(w http.ResponseWriter, r *http.Request, repository *aut
 	auth := authorization.New(request, idempotencyKey)
 
 	err = repository.Create(r.Context(), auth)
+
+	if errors.Is(err, authorization.ErrDuplicateIdempotencyKey) {
+		existingAuth, findErr := repository.FindByIdempotencyKey(
+			r.Context(),
+			request.MerchantID,
+			idempotencyKey,
+		)
+
+		if findErr != nil {
+			fmt.Println("failed to find existing authorization:", findErr)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		if existingAuth == nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(existingAuth)
+		return
+	}
+
 	if err != nil {
 		fmt.Println("failed to create authorization:", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
