@@ -1,0 +1,2 @@
+ALTER TABLE authorizations
+DROP COLUMN request_fingerprint

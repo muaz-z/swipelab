@@ -30,10 +30,11 @@ func (r *Repository) Create(ctx context.Context, auth Authorization) error {
 			currency,
 			status,
 			idempotency_key,
+			request_fingerprint,
 			created_at,
 			updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 
 	_, err := r.db.Exec(
@@ -45,6 +46,7 @@ func (r *Repository) Create(ctx context.Context, auth Authorization) error {
 		auth.Currency,
 		auth.Status,
 		auth.IdempotencyKey,
+		auth.RequestFingerprint,
 		auth.CreatedAt,
 		auth.CreatedAt,
 	)
@@ -74,6 +76,7 @@ func (r *Repository) FindByIdempotencyKey(
 			currency,
 			status,
 			idempotency_key,
+			request_fingerprint,
 			created_at
 		FROM authorizations
 		WHERE merchant_id = $1
@@ -94,6 +97,7 @@ func (r *Repository) FindByIdempotencyKey(
 		&auth.Currency,
 		&auth.Status,
 		&auth.IdempotencyKey,
+		&auth.RequestFingerprint,
 		&auth.CreatedAt,
 	)
 

@@ -12,6 +12,7 @@ import (
 	"github.com/muaz-z/swipelab/acquirer/internal/authorization"
 	"github.com/muaz-z/swipelab/acquirer/internal/database"
 	"github.com/muaz-z/swipelab/acquirer/internal/merchant"
+	"github.com/muaz-z/swipelab/acquirer/internal/network"
 )
 
 func main() {
@@ -35,8 +36,10 @@ func main() {
 	authorizationRepository := authorization.NewRepository(db)
 	fmt.Println("Connected to POSTGRESQL")
 
+	networkClient := network.NewClient("http://localhost:8082")
+
 	http.HandleFunc("/authorizations", func(w http.ResponseWriter, r *http.Request) {
-		handleAuthorization(w, r, authorizationRepository)
+		handleAuthorization(w, r, authorizationRepository, networkClient)
 	})
 	fmt.Println("Acquirer listening on :8081")
 
@@ -47,13 +50,13 @@ func main() {
 	}
 }
 
-func handleAuthorization(w http.ResponseWriter, r *http.Request, repository *authorization.Repository) {
+func handleAuthorization(w http.ResponseWriter, r *http.Request, repository *authorization.Repository, networkClient *network.Client) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowerd", http.StatusMethodNotAllowed)
 		return
 	}
 
-	idempotencyKey := r.Header.Get("idempotency-key")
+	idempotencyKey := r.Header.Get("Idempotency-key")
 
 	if idempotencyKey == "" {
 		http.Error(
@@ -78,6 +81,8 @@ func handleAuthorization(w http.ResponseWriter, r *http.Request, repository *aut
 		return
 	}
 
+	requestFingerprint := authorization.Fingerprint(request)
+
 	m, exists := merchant.FindByID(request.MerchantID)
 
 	if !exists {
@@ -87,7 +92,7 @@ func handleAuthorization(w http.ResponseWriter, r *http.Request, repository *aut
 	}
 
 	if !m.Active {
-		http.Error(w, "merchant is inactive", http.StatusBadRequest)
+		http.Error(w, "merchant is inactive", http.StatusForbidden)
 		return
 
 	}
@@ -101,16 +106,25 @@ func handleAuthorization(w http.ResponseWriter, r *http.Request, repository *aut
 	if err != nil {
 		fmt.Println("failed to check idempotency key", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
 	}
 
 	if existingAuth != nil {
+		if existingAuth.RequestFingerprint != requestFingerprint {
+			http.Error(
+				w,
+				"idempotency key already used with a different request",
+				http.StatusConflict,
+			)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(existingAuth)
 		return
 	}
 
-	auth := authorization.New(request, idempotencyKey)
+	auth := authorization.New(request, idempotencyKey, requestFingerprint)
 
 	err = repository.Create(r.Context(), auth)
 
@@ -132,6 +146,15 @@ func handleAuthorization(w http.ResponseWriter, r *http.Request, repository *aut
 			return
 		}
 
+		if existingAuth.RequestFingerprint != requestFingerprint {
+			http.Error(
+				w,
+				"idempotency key already used with a different request",
+				http.StatusConflict,
+			)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(existingAuth)
@@ -141,6 +164,22 @@ func handleAuthorization(w http.ResponseWriter, r *http.Request, repository *aut
 	if err != nil {
 		fmt.Println("failed to create authorization:", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	networkRequest := network.AuthorizationRequest{
+		AuthorizationID: auth.ID,
+		MerchantID:      auth.MerchantID,
+		CardNumber:      request.CardNumber,
+		Amount:          auth.Amount,
+		Currency:        auth.Currency,
+	}
+
+	err = networkClient.Authorize(r.Context(), networkRequest)
+
+	if err != nil {
+		fmt.Println("failed to authorize card netwrok:", err)
+		http.Error(w, "card network unavailable", http.StatusBadGateway)
 		return
 	}
 

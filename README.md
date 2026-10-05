@@ -10,6 +10,19 @@ The project is inspired by *The Anatomy of the Swipe* by Ahmed Siddiqui and focu
 
 *Diagram from* The Anatomy of the Swipe *by Ahmed Siddiqui.*
 
+```text
+POS
+ │
+ ▼
+Acquirer Processor (:8081)
+ │
+ ▼
+Card Network (:8082)
+ │
+ ▼
+Issuer Processor
+```
+
 Each component is implemented as an independent service and communicates over network protocols rather than importing code from other services.
 
 ## Services
@@ -33,10 +46,11 @@ Currently implemented:
 - Idempotency key support
 - Duplicate authorization prevention for sequential retries
 - Concurrency-safe idempotency
+- Idempotency request fingerprint validation
+- Card network authorization forwarding
 
 Planned:
 
-- Card network integration
 - Timeouts and retries
 - Authorization responses
 - Capture
@@ -49,9 +63,10 @@ Planned:
 
 **Language:** Go
 
-Planned.
-
 The card network will route authorization messages between the acquirer and issuer.
+
+Currently implemented:
+
 
 ### Issuer Processor
 
