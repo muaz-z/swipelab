@@ -48,6 +48,9 @@ Currently implemented:
 - Concurrency-safe idempotency
 - Idempotency request fingerprint validation
 - Card network authorization forwarding
+- Authorization failure status updates (`PENDING` → `FAILED`)
+- Network rejection handling
+- Uncertain authorization outcome handling (retains `PENDING` on network errors)
 
 Planned:
 

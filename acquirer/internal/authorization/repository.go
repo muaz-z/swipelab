@@ -3,6 +3,7 @@ package authorization
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -110,4 +111,30 @@ func (r *Repository) FindByIdempotencyKey(
 
 	return &auth, nil
 
+}
+
+func (r *Repository) UpdateStatus(
+	ctx context.Context,
+	id string,
+	status Status,
+) error {
+	query := `
+	UPDATE authorizations
+        SET status = $1,
+            updated_at = NOW()
+        WHERE id = $2
+	`
+
+	result, err := r.db.Exec(ctx, query, status, id)
+
+	if err != nil {
+		return fmt.Errorf("update authorization status: %w", err)
+
+	}
+
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("authorization %s not found", id)
+	}
+
+	return nil
 }

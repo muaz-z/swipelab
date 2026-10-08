@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 )
@@ -19,6 +20,8 @@ func NewClient(baseURL string) *Client {
 		httpClient: &http.Client{},
 	}
 }
+
+var ErrRejected = errors.New("card network rejected authorization")
 
 func (c *Client) Authorize(
 	ctx context.Context,
@@ -49,8 +52,12 @@ func (c *Client) Authorize(
 
 	defer response.Body.Close()
 
+	if response.StatusCode >= 400 && response.StatusCode < 500 {
+		return fmt.Errorf("%w: HTTP %d", ErrRejected, response.StatusCode)
+	}
+
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("card network returned status %d", response.StatusCode)
+		return fmt.Errorf("unexpected card network response: HTTP %d", response.StatusCode)
 	}
 
 	return nil

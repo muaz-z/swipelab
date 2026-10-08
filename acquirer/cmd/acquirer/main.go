@@ -178,9 +178,21 @@ func handleAuthorization(w http.ResponseWriter, r *http.Request, repository *aut
 	err = networkClient.Authorize(r.Context(), networkRequest)
 
 	if err != nil {
-		fmt.Println("failed to authorize card netwrok:", err)
-		http.Error(w, "card network unavailable", http.StatusBadGateway)
+		fmt.Println("failed to authorize card network:", err)
+
+		if errors.Is(err, network.ErrRejected) {
+			updateErr := repository.UpdateStatus(r.Context(), auth.ID, authorization.StatusFailed)
+			if updateErr != nil {
+				fmt.Println("failed to update authorization status", updateErr)
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+				return
+			}
+			http.Error(w, "authorization processing failed", http.StatusBadGateway)
+			return
+		}
+		http.Error(w, "authorization outcome unknown", http.StatusBadGateway)
 		return
+
 	}
 
 	w.Header().Set("Content-Type", "application/json")
