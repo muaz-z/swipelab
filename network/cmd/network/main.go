@@ -6,11 +6,16 @@ import (
 	"net/http"
 
 	"github.com/muaz-z/swipelab/network/internal/authorization"
+	"github.com/muaz-z/swipelab/network/internal/issuer"
 	"github.com/muaz-z/swipelab/network/internal/routing"
 )
 
 func main() {
-	http.HandleFunc("/authorizations", handleAuthorization)
+	issuerClient := issuer.NewClient()
+
+	http.HandleFunc("/authorizations", func(w http.ResponseWriter, r *http.Request) {
+		handleAuthorization(w, r, issuerClient)
+	})
 	fmt.Println("Card Network listening on :8082")
 
 	err := http.ListenAndServe(":8082", nil)
@@ -21,7 +26,7 @@ func main() {
 
 }
 
-func handleAuthorization(w http.ResponseWriter, r *http.Request) {
+func handleAuthorization(w http.ResponseWriter, r *http.Request, issuerClient *issuer.Client) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -41,9 +46,16 @@ func handleAuthorization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	issuer, err := routing.FindIssuer(request.CardNumber)
+	issuerInfo, err := routing.FindIssuer(request.CardNumber)
 	if err != nil {
 		http.Error(w, "issuer not found", http.StatusBadRequest)
+		return
+	}
+
+	err = issuerClient.Authorize(r.Context(), issuerInfo.URL, request)
+	if err != nil {
+		fmt.Printf("issuer authorization failed: %v/n", err)
+		http.Error(w, "issuer processing failed", http.StatusBadGateway)
 		return
 	}
 
@@ -58,7 +70,7 @@ func handleAuthorization(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf(
 		"Authorization %s routed to %s\n",
 		request.AuthorizationID,
-		issuer.Name,
+		issuerInfo.Name,
 	)
 
 	w.WriteHeader(http.StatusOK)
